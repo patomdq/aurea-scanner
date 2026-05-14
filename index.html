@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>AUREA ORB Scanner</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap');
+  :root {
+    --bg:#0a0b0e; --surface:#111318; --border:#1e2128;
+    --accent:#00ff88; --accent2:#ff6b35; --accent3:#4d9fff;
+    --text:#e8eaf0; --muted:#5a6070;
+    --long:#00ff88; --short:#ff4466;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:var(--bg); color:var(--text); font-family:'DM Sans',sans-serif; padding:24px; min-height:100vh; }
+  .header { display:flex; align-items:center; justify-content:space-between; margin-bottom:20px; padding-bottom:16px; border-bottom:1px solid var(--border); }
+  .logo { font-family:'Space Mono',monospace; font-size:20px; font-weight:700; color:var(--accent); letter-spacing:3px; }
+  .logo span { color:var(--muted); font-weight:400; }
+  .badge { font-family:'Space Mono',monospace; font-size:11px; color:var(--muted); background:var(--surface); border:1px solid var(--border); padding:6px 12px; border-radius:4px; }
+  .controls { display:flex; gap:10px; margin-bottom:18px; flex-wrap:wrap; align-items:center; }
+  .btn { font-family:'Space Mono',monospace; font-size:11px; padding:8px 16px; border-radius:4px; border:1px solid var(--border); background:var(--surface); color:var(--muted); cursor:pointer; transition:all .2s; letter-spacing:1px; }
+  .btn.active { border-color:var(--accent); color:var(--accent); background:rgba(0,255,136,.05); }
+  .scan-btn { background:var(--accent); color:#000; border:none; font-weight:700; margin-left:auto; font-size:12px; padding:8px 24px; }
+  .scan-btn:hover { background:#00cc6e; }
+  .scan-btn:disabled { background:var(--muted); cursor:not-allowed; }
+  .status { background:var(--surface); border:1px solid var(--border); border-radius:6px; padding:12px 16px; margin-bottom:16px; font-family:'Space Mono',monospace; font-size:11px; color:var(--muted); display:flex; align-items:center; gap:8px; min-height:42px; }
+  .dot { width:7px; height:7px; border-radius:50%; background:var(--muted); flex-shrink:0; }
+  .dot.on { background:var(--accent); animation:pulse 1.5s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+  .summary { display:none; gap:16px; padding:10px 16px; background:var(--surface); border:1px solid var(--border); border-radius:6px; margin-bottom:14px; flex-wrap:wrap; }
+  .sum-item { font-family:'Space Mono',monospace; font-size:10px; color:var(--muted); }
+  .sum-item span { color:var(--text); font-weight:700; }
+  .grid { display:grid; gap:10px; }
+  .card { background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:16px; display:grid; grid-template-columns:80px 1fr 100px; gap:12px; align-items:start; transition:border-color .2s; animation:slideIn .3s ease forwards; opacity:0; }
+  @keyframes slideIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+  .card:hover { border-color:var(--accent); }
+  .card.long { border-left:3px solid var(--long); }
+  .card.short { border-left:3px solid var(--short); }
+  .ticker { font-family:'Space Mono',monospace; font-size:18px; font-weight:700; }
+  .sig-badge { display:inline-block; font-family:'Space Mono',monospace; font-size:9px; font-weight:700; padding:3px 8px; border-radius:3px; letter-spacing:1px; margin-top:5px; }
+  .sig-badge.long { background:rgba(0,255,136,.15); color:var(--long); border:1px solid rgba(0,255,136,.3); }
+  .sig-badge.short { background:rgba(255,68,102,.15); color:var(--short); border:1px solid rgba(255,68,102,.3); }
+  .company { font-size:13px; font-weight:500; margin-bottom:4px; }
+  .reason { font-size:12px; color:var(--muted); line-height:1.5; }
+  .tags { display:flex; gap:5px; margin-top:7px; flex-wrap:wrap; }
+  .tag { font-family:'Space Mono',monospace; font-size:9px; padding:2px 7px; border-radius:3px; background:rgba(255,255,255,.04); color:var(--muted); border:1px solid var(--border); }
+  .tag.g { color:var(--accent); border-color:rgba(0,255,136,.2); }
+  .tag.b { color:var(--accent3); border-color:rgba(77,159,255,.2); }
+  .tag.o { color:var(--accent2); border-color:rgba(255,107,53,.2); }
+  .meta { text-align:right; }
+  .score { font-family:'Space Mono',monospace; font-size:22px; font-weight:700; color:var(--accent); line-height:1; }
+  .score-lbl { font-family:'Space Mono',monospace; font-size:9px; color:var(--muted); letter-spacing:1px; margin-top:2px; }
+  .change { font-family:'Space Mono',monospace; font-size:12px; margin-top:6px; }
+  .pos { color:var(--long); } .neg { color:var(--short); }
+  .price-lbl { font-family:'Space Mono',monospace; font-size:10px; color:var(--muted); margin-top:3px; }
+  .empty { text-align:center; padding:60px 20px; color:var(--muted); font-family:'Space Mono',monospace; font-size:12px; letter-spacing:1px; }
+  .empty .icon { font-size:32px; margin-bottom:12px; }
+  .skel { background:linear-gradient(90deg,var(--surface) 25%,var(--border) 50%,var(--surface) 75%); background-size:200% 100%; animation:shimmer 1.5s infinite; border-radius:4px; }
+  @keyframes shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
+  .disclaimer { margin-top:20px; font-size:10px; color:var(--muted); text-align:center; font-family:'Space Mono',monospace; letter-spacing:.5px; line-height:1.8; }
+  .section-hdr { font-family:'Space Mono',monospace; font-size:9px; color:var(--muted); letter-spacing:2px; margin:16px 0 8px; padding-bottom:6px; border-bottom:1px solid var(--border); }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="logo">AUREA <span>/ ORB SCANNER</span></div>
+  <div class="badge" id="dateBadge">--</div>
+</div>
+
+<div class="controls">
+  <button class="btn active" id="btnNY" onclick="setSession('NY')">● NY SESSION</button>
+  <button class="btn" id="btnEU" onclick="setSession('EU')">● EU SESSION</button>
+  <button class="scan-btn btn" id="scanBtn" onclick="runScan()">▶ SCAN AHORA</button>
+</div>
+
+<div class="status">
+  <div class="dot" id="dot"></div>
+  <span id="statusText">Listo. Pulsa SCAN AHORA para obtener candidatos ORB del día.</span>
+</div>
+
+<div class="summary" id="summaryBar">
+  <div class="sum-item">CANDIDATOS: <span id="sumTotal">0</span></div>
+  <div class="sum-item">LONG: <span id="sumLong" style="color:var(--long)">0</span></div>
+  <div class="sum-item">SHORT: <span id="sumShort" style="color:var(--short)">0</span></div>
+  <div class="sum-item">FUENTE: <span>FMP API</span></div>
+</div>
+
+<div id="resultsGrid" class="grid">
+  <div class="empty">
+    <div class="icon">◎</div>
+    <div>ESPERANDO ESCANEO</div>
+    <div style="margin-top:8px;font-size:10px">Selecciona sesión y pulsa SCAN AHORA</div>
+  </div>
+</div>
+
+<div class="disclaimer">
+  ⚠ Datos via Financial Modeling Prep API · Plan gratuito = datos end-of-day<br>
+  Análisis orientativo · Verificar siempre en TradingView antes de operar<br>
+  AUREA ORB Strategy · v1.0
+</div>
+
+<script>
+const FMP_KEY = 'XPfNnraUVCbn6rnjJFUMkaJXrXm2K4JQ';
+const FMP_BASE = 'https://financialmodelingprep.com/stable';
+let session = 'NY';
+
+function setSession(s) {
+  session = s;
+  document.getElementById('btnNY').className = 'btn' + (s==='NY'?' active':'');
+  document.getElementById('btnEU').className = 'btn' + (s==='EU'?' active':'');
+}
+
+function updateDate() {
+  const now = new Date();
+  document.getElementById('dateBadge').textContent =
+    now.toLocaleDateString('es-ES',{weekday:'short',day:'2-digit',month:'short',year:'numeric'}) +
+    ' · ' + now.toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'});
+}
+updateDate();
+setInterval(updateDate, 30000);
+
+function setStatus(t, active) {
+  document.getElementById('statusText').textContent = t;
+  document.getElementById('dot').className = 'dot' + (active ? ' on' : '');
+}
+
+function showSkeletons() {
+  const g = document.getElementById('resultsGrid');
+  g.innerHTML = '';
+  for (let i = 0; i < 6; i++) {
+    const d = document.createElement('div');
+    d.className = 'card'; d.style.opacity = '1';
+    d.innerHTML = `
+      <div>
+        <div class="skel" style="width:55px;height:20px"></div>
+        <div class="skel" style="width:38px;height:13px;margin-top:6px"></div>
+      </div>
+      <div>
+        <div class="skel" style="width:75%;height:13px"></div>
+        <div class="skel" style="width:55%;height:12px;margin-top:6px"></div>
+        <div class="skel" style="width:65%;height:12px;margin-top:4px"></div>
+      </div>
+      <div style="text-align:right">
+        <div class="skel" style="width:38px;height:26px;margin-left:auto"></div>
+      </div>`;
+    g.appendChild(d);
+  }
+}
+
+async function fmpFetch(endpoint) {
+  const sep = endpoint.includes('?') ? '&' : '?';
+  const url = `${FMP_BASE}${endpoint}${sep}apikey=${FMP_KEY}`;
+  const r = await fetch(url);
+  if (!r.ok) throw new Error(`FMP error ${r.status}: ${r.statusText}`);
+  return r.json();
+}
+
+function calcScore(item, type) {
+  let score = 5;
+  const chg = Math.abs(parseFloat(item.changesPercentage || 0));
+  const price = parseFloat(item.price || 0);
+  const vol = parseFloat(item.volume || 0);
+  if (chg > 5) score += 3;
+  else if (chg > 3) score += 2;
+  else if (chg > 1.5) score += 1;
+  if (price >= 50 && price <= 400) score += 1;
+  if (type === 'active') score += 1;
+  return Math.min(score, 10);
+}
+
+function getSignal(item, type) {
+  if (type === 'gainer') return 'LONG';
+  if (type === 'loser') return 'SHORT';
+  return parseFloat(item.changesPercentage || 0) >= 0 ? 'LONG' : 'SHORT';
+}
+
+function getReason(item, type) {
+  const chg = parseFloat(item.changesPercentage || 0);
+  const chgStr = (chg >= 0 ? '+' : '') + chg.toFixed(2) + '%';
+  if (type === 'gainer') return `${chgStr} en el día. Momentum alcista sostenido — esperar ruptura limpia del ORB High con volumen.`;
+  if (type === 'loser') return `${chgStr} en el día. Presión vendedora — esperar ruptura del ORB Low con confirmación de volumen.`;
+  return `Volumen inusual · ${chgStr}. Alta actividad pre-apertura — rango de apertura definido esperado.`;
+}
+
+function getTags(item, type, sig) {
+  const tags = [];
+  const chg = Math.abs(parseFloat(item.changesPercentage || 0));
+  if (chg > 3) tags.push({t:'ATR ALTO', c:'g'});
+  if (type === 'active') tags.push({t:'VOL INUSUAL', c:'g'});
+  else tags.push({t:'VOLUMEN', c:'g'});
+  if (sig === 'LONG') tags.push({t:'TENDENCIA UP', c:'g'});
+  else tags.push({t:'TENDENCIA DOWN', c:''});
+  tags.push({t:'SIN EARNINGS', c:'b'});
+  return tags;
+}
+
+function renderResults(candidates) {
+  const g = document.getElementById('resultsGrid');
+  g.innerHTML = '';
+
+  if (!candidates.length) {
+    g.innerHTML = '<div class="empty"><div class="icon">◎</div><div>SIN CANDIDATOS HOY</div><div style="margin-top:8px;font-size:10px">Condiciones no favorables para ORB</div></div>';
+    return;
+  }
+
+  document.getElementById('summaryBar').style.display = 'flex';
+  document.getElementById('sumTotal').textContent = candidates.length;
+  document.getElementById('sumLong').textContent = candidates.filter(c => c.signal === 'LONG').length;
+  document.getElementById('sumShort').textContent = candidates.filter(c => c.signal === 'SHORT').length;
+
+  candidates.forEach((c, i) => {
+    const card = document.createElement('div');
+    card.className = `card ${c.signal.toLowerCase()}`;
+    card.style.animationDelay = `${i * 0.08}s`;
+
+    const chg = parseFloat(c.change || 0);
+    const chgStr = (chg >= 0 ? '+' : '') + chg.toFixed(2) + '%';
+    const price = parseFloat(c.price || 0);
+    const tagsHtml = (c.tags || []).map(t => `<span class="tag ${t.c}">${t.t}</span>`).join('');
+
+    card.innerHTML = `
+      <div>
+        <div class="ticker">${c.ticker}</div>
+        <div class="sig-badge ${c.signal.toLowerCase()}">${c.signal}</div>
+      </div>
+      <div>
+        <div class="company">${c.name}</div>
+        <div class="reason">${c.reason}</div>
+        <div class="tags">${tagsHtml}</div>
+      </div>
+      <div class="meta">
+        <div class="score">${c.score}</div>
+        <div class="score-lbl">SCORE</div>
+        ${price > 0 ? `<div class="change ${chg>=0?'pos':'neg'}">${chgStr}</div><div class="price-lbl">$${price.toFixed(2)}</div>` : ''}
+      </div>`;
+    g.appendChild(card);
+  });
+}
+
+async function runScan() {
+  const btn = document.getElementById('scanBtn');
+  btn.disabled = true;
+  btn.textContent = '⟳ ESCANEANDO...';
+  document.getElementById('summaryBar').style.display = 'none';
+  setStatus('Conectando con FMP API...', true);
+  showSkeletons();
+
+  try {
+    setStatus('Descargando gainers, losers y activos...', true);
+
+    const [gainers, losers, actives] = await Promise.all([
+      fmpFetch('/gainers'),
+      fmpFetch('/losers'),
+      fmpFetch('/actives')
+    ]);
+
+    setStatus('Filtrando y puntuando candidatos ORB...', true);
+
+    const minPrice = 15;
+    const maxPrice = 600;
+    const minChg = 1.0;
+
+    const process = (items, type) =>
+      (Array.isArray(items) ? items : [])
+        .filter(i => {
+          const p = parseFloat(i.price || 0);
+          const c = Math.abs(parseFloat(i.changesPercentage || 0));
+          return p >= minPrice && p <= maxPrice && c >= minChg;
+        })
+        .slice(0, 4)
+        .map(i => ({
+          ticker: i.symbol,
+          name: (i.name || i.companyName || i.symbol).substring(0, 30),
+          signal: getSignal(i, type),
+          score: calcScore(i, type),
+          change: i.changesPercentage || 0,
+          price: i.price || 0,
+          reason: getReason(i, type),
+          tags: getTags(i, type, getSignal(i, type))
+        }));
+
+    let candidates = [
+      ...process(gainers, 'gainer'),
+      ...process(losers, 'loser'),
+      ...process(actives, 'active')
+    ];
+
+    // Deduplicar
+    const seen = new Set();
+    candidates = candidates.filter(c => {
+      if (seen.has(c.ticker)) return false;
+      seen.add(c.ticker);
+      return true;
+    });
+
+    // Ordenar por score
+    candidates.sort((a, b) => b.score - a.score);
+
+    // Agregar instrumento base según sesión (siempre primero)
+    const base = session === 'NY'
+      ? [{
+          ticker: 'MNQ',
+          name: 'Micro E-mini Nasdaq Futures',
+          signal: 'LONG',
+          score: 9,
+          change: 0,
+          price: 0,
+          reason: 'Futuro índice principal sesión NY. Siempre primer candidato ORB. Verificar dirección 1H en TradingView antes de apertura.',
+          tags: [{t:'FUTURO',c:'b'},{t:'LIQUIDO',c:'g'},{t:'ORB PRIMARIO',c:'g'}]
+        }, {
+          ticker: 'SPY',
+          name: 'SPDR S&P 500 ETF',
+          signal: 'LONG',
+          score: 8,
+          change: 0,
+          price: 0,
+          reason: 'ETF SP500 — segundo candidato ORB NY. Alta liquidez, spreads bajos, movimientos predecibles.',
+          tags: [{t:'ETF',c:'b'},{t:'LIQUIDO',c:'g'},{t:'ORB SECUNDARIO',c:'g'}]
+        }]
+      : [{
+          ticker: 'FDXM',
+          name: 'Mini-DAX Futures',
+          signal: 'LONG',
+          score: 9,
+          change: 0,
+          price: 0,
+          reason: 'Futuro índice principal sesión EU. Siempre primer candidato ORB. Verificar dirección 1H en TradingView.',
+          tags: [{t:'FUTURO',c:'b'},{t:'LIQUIDO',c:'g'},{t:'ORB PRIMARIO',c:'g'}]
+        }];
+
+    // Combinar: base + top candidatos del mercado (sin duplicar)
+    const baseTickets = new Set(base.map(b => b.ticker));
+    const filtered = candidates.filter(c => !baseTickets.has(c.ticker)).slice(0, 6);
+    const final = [...base, ...filtered];
+
+    renderResults(final);
+    setStatus(`Escaneo completado · ${final.length} candidatos · Datos FMP`, false);
+
+  } catch (err) {
+    console.error(err);
+    setStatus('Error FMP: ' + err.message + ' · Verifica tu API key y conexión', false);
+    document.getElementById('resultsGrid').innerHTML =
+      `<div class="empty"><div class="icon">✕</div><div>ERROR DE CONEXIÓN</div><div style="margin-top:8px;font-size:10px">${err.message}</div><div style="margin-top:6px;font-size:9px;color:var(--accent3)">Abre este archivo desde Chrome, no desde Finder</div></div>`;
+  }
+
+  btn.disabled = false;
+  btn.textContent = '▶ SCAN AHORA';
+}
+</script>
+</body>
+</html>
