@@ -16,7 +16,7 @@ export default async function handler(req, res) {
     const [gainers, losers, actives] = await Promise.all([
       fmpFetch('biggest-gainers'),
       fmpFetch('biggest-losers'),
-      fmpFetch('most-actives')
+      fmpFetch('most-active')
     ]);
     res.status(200).json({ gainers, losers, actives });
   } catch (err) {
